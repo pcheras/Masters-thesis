@@ -1,0 +1,9 @@
+,RMSE Interpolation (mean),RMSE Interpolation (std),RMSE Extrapolation (mean),RMSE Extrapolation (std),RMSE_F (mean),RMSE_F (std),Time
+Linear Mixed Effects Model with no fixed features (random intercept),10.641,10.018,8.363,5.786,,,0.025
+Linear Mixed Effects Model with Random Intercept,10.687,10.128,8.358,5.745,2.436,0.853,0.020
+Linear Mixed Effects Model with Shared Gaussian Process,10.561,10.082,7.715,5.470,2.526,0.832,0.421
+Linear Mixed Effects Model with Independent Gaussian Process (*),10.226,10.022,7.671,5.465,2.248,0.602,0.104
+Gradient-boosted tree with group as categorical variable (no random effects),10.287,10.092,7.924,5.450,,,0.013
+GPBoost with Random Intercept,10.626,10.015,8.375,5.748,1.778,0.450,0.069
+GPBoost with Shared Gaussian Process,10.508,9.945,7.712,5.542,1.809,0.454,1.568
+GPBoost with Independent Gaussian Process (*),10.211,9.936,7.706,5.495,1.704,0.486,0.425
