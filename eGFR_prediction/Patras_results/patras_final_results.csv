@@ -1,0 +1,11 @@
+,RMSE_interpolation,RMSE_extrapolation
+Linear Mixed Effects Model with no fixed features (random intercept),13.773 +/- 0.411,26.007 +/- 1.353
+Linear Mixed Effects Model with Random Intercept,10.946 +/- 0.191,26.016 +/- 10.421
+Linear Mixed Effects Model with Shared Gaussian Process,10.857 +/- 0.320,20.506 +/- 0.399
+Linear Mixed Effects Model with Independent Gaussian Process,11.074 +/- 0.485,35.557 +/- 23.594
+Gradient-boosted tree with group as categorical variable (no random effects),14.311 +/- 0.547,17.021 +/- 0.948
+GPBoost with Random Intercept,10.819 +/- 0.315,19.688 +/- 1.066
+GPBoost with Shared Gaussian Process using Vecchia,13.694 +/- 0.162,16.920 +/- 0.688
+GPBoost with Independent Gaussian Process,10.875 +/- 0.265,19.601 +/- 0.983
+GPBoost with Ind. GP & custom kernel params during prediction,10.628 +/- 0.261,19.726 +/- 0.634
+GPBoost with Ind. GP & custom param intialization during training,10.572 +/- 0.247,19.752 +/- 0.758

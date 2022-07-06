@@ -1,0 +1,9 @@
+,RMSE_interpolation,RMSE_extrapolation,Time
+Linear Mixed Effects Model with no fixed features (random intercept),12.710275045885313,21.53328486276382,2.4849326610565186
+Linear Mixed Effects Model with Random Intercept,12.984049658218021,19.307229708095576,4.5025634765625
+Linear Mixed Effects Model with Shared Gaussian Process,12.915849674464988,19.2233650637565,266.3973972797394
+Linear Mixed Effects Model with Independent Gaussian Process,12.136107343830963,19.246463179319566,1.143385410308838
+Gradient-boosted tree with group as categorical variable (no random effects),14.12184079751838,14.75167536620976,0.045113325119018555
+GPBoost with Random Intercept,10.447454721595527,15.179910650107407,178.38866329193115
+GPBoost with Shared Gaussian Process using Vecchia,13.799893052354477,15.965377114690986,272.78500056266785
+GPBoost with Independent Gaussian Process,9.803017691576436,15.200518816640319,51.58689045906067

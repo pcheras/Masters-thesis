@@ -324,11 +324,15 @@ def grid_search_tune_parameters_multiple(data_cv_list, dataset_list, param_grid,
                                          num_boost_round=100,
                                          use_gp_model_for_validation=True, train_gp_model_cov_pars=True,
                                          folds_list=None, nfold=5, stratified=False, shuffle=True,
-                                         metrics=None, fobj=None, feval=None, init_model=None,
+                                         metrics='rmse', fobj=None, feval=None, init_model=None,
                                          feature_name='auto', categorical_feature='auto',
                                          early_stopping_rounds=None, fpreproc=None,
                                          verbose_eval=1, seed=0, callbacks=None,
-                                         gp_model_type='Random Intercept'):
+                                         gp_model_type='Random Intercept', 
+                                         num_neighbors=30, 
+                                         vecchia_ordering='none', 
+                                         vecchia_pred_type='order_pred_first', 
+                                         num_neighbors_pred=30):
     '''
     Conducts grid search over a list of training sets.
     '''
@@ -372,6 +376,8 @@ def grid_search_tune_parameters_multiple(data_cv_list, dataset_list, param_grid,
     best_params = {}
     best_num_boost_round = num_boost_round
     counter_num_comb = 1
+
+
     for param_comb_number in try_param_combs:
         cvbst_list = []
         param_comb = gpb.engine._get_param_combination(param_comb_number=param_comb_number, param_grid=param_grid)
@@ -385,10 +391,17 @@ def grid_search_tune_parameters_multiple(data_cv_list, dataset_list, param_grid,
             folds = [folds_list[i]]
             if gp_model_type == 'Random Intercept':
                 gp_model = gpb.GPModel(group_data=np.column_stack((data_cv_list[i]['ID'], data_cv_list[i]['times'])))
+
             elif gp_model_type == 'Individual GP':
                 gp_model = gpb.GPModel(group_data=data_cv_list[i]['ID'], gp_coords=data_cv_list[i]['times'], cluster_ids=data_cv_list[i]['ID'], cov_function='exponential')
+
+            elif gp_model_type == 'Shared GP': # Vecchia approximation in GPBoost model with Shared GP
+                gp_model = gpb.GPModel(gp_coords=data_cv_list[i]['times'], cov_function='exponential', vecchia_approx=True, num_neighbors=num_neighbors, 
+                                                            vecchia_ordering=vecchia_ordering, vecchia_pred_type=vecchia_pred_type, num_neighbors_pred=num_neighbors_pred)
+
             elif gp_model_type is None: # CatBoost model
                 gp_model = None
+
             else:
                 raise Exception('gp_model_type is invalid')
                 
@@ -404,6 +417,7 @@ def grid_search_tune_parameters_multiple(data_cv_list, dataset_list, param_grid,
                         early_stopping_rounds=early_stopping_rounds, fpreproc=fpreproc,
                         verbose_eval=verbose_eval_cv, seed=seed, callbacks=callbacks,
                         eval_train_metric=False, return_cvbooster=False)
+
                         
             cvbst_list.append(cvbst)
         current_score_is_better = False
@@ -726,6 +740,238 @@ def train_and_test_customGP(datasets, n_datasets, num_boost_round=0, params={}, 
         return time_list, RMSE_list1, RMSE_list2
     else:
         return time_list, RMSE_list1, RMSE_list2, F_list
+
+
+def train_and_test_Vecchia(datasets, n_datasets, num_boost_round=0, params={}, merf=False, GPBoost_cat=False, linear=False, GP=False, shared=False, no_features=False, kernel='exponential', 
+                                                            matern_param=2.5, vecchia_approx=True, num_neighbors=5, vecchia_ordering='none', vecchia_pred_type='order_pred_first', num_neighbors_pred=5):
+
+    np.random.seed(1)
+    RMSE_list1 = []
+    RMSE_list2 = []
+    F_list = []
+    time_list = []
+
+    for i in tnrange(n_datasets):
+
+        data_train = datasets['data_train'][i]
+        X_train = datasets['X_train'][i]
+        X_test1 = datasets['X_test1'][i]
+        X_test2 = datasets['X_test2'][i]
+        y_train = datasets['y_train'][i]
+        y_test1 = datasets['y_test1'][i]
+        y_test2 = datasets['y_test2'][i]
+        F_test1 = datasets['F_test1'][i]
+        F_test2 = datasets['F_test2'][i]
+
+
+        #if not GPBoost_cat:
+        # Random effects covariates
+        groups_train = X_train['group']
+        groups_test1 = X_test1['group']
+        groups_test2 = X_test2['group']
+        times_train = X_train['times']
+        times_test1 = X_test1['times']
+        times_test2 = X_test2['times']
+
+
+        ########### Linear mixed effects model ##############
+        if linear:
+            if no_features:
+                X_train_linear = np.ones(len(X_train))
+                X_test1_linear = np.ones(len(X_test1))
+                X_test2_linear = np.ones(len(X_test2))
+            else:
+                X_train_linear = np.column_stack((np.ones(len(X_train)), X_train[['feature_1','feature_2','feature_3','feature_4']])) # add column of ones to get a global intercept 
+                X_test1_linear = np.column_stack((np.ones(len(X_test1)), X_test1[['feature_1','feature_2','feature_3','feature_4']]))
+                X_test2_linear = np.column_stack((np.ones(len(X_test2)), X_test2[['feature_1','feature_2','feature_3','feature_4']]))
+        #########################################################
+
+
+        else:
+            # Models with GP components for the observation times (includes both linear models and Boosted-tree fixed effect models)
+            if GP:
+
+                if kernel == 'matern':
+                    if shared:
+                        gp_model = gpb.GPModel(group_data=groups_train, gp_coords=times_train, cov_function=kernel, cov_fct_shape=matern_param)
+                    else:
+                        gp_model = gpb.GPModel(group_data=groups_train, gp_coords=times_train, cluster_ids=groups_train, cov_function=kernel, cov_fct_shape=matern_param)
+
+                else:
+                    if shared:
+                        gp_model = gpb.GPModel(gp_coords=X_train['times'], cov_function='exponential', vecchia_approx=vecchia_approx, num_neighbors=num_neighbors, 
+                                                                                vecchia_ordering=vecchia_ordering, vecchia_pred_type=vecchia_pred_type, num_neighbors_pred=num_neighbors_pred)
+                    else:
+                        gp_model = gpb.GPModel(group_data=groups_train, gp_coords=times_train, cluster_ids=groups_train, cov_function=kernel)
+
+            # LME models without GP components
+            else:
+                gp_model = gpb.GPModel(group_data=np.column_stack((groups_train, times_train)))
+            gp_model.set_optim_params(params={'optimizer_cov': 'gradient_descent', 'use_nesterov_acc': True}) # these are the default parameters
+
+
+        #################### Training ####################
+        start_time = time.time()
+
+        try:
+            if merf:
+                merf_model.fit(X_train[['feature_1','feature_2','feature_3','feature_4']], Z_train, groups_train, y_train)
+
+            elif GPBoost_cat:
+                bst = gpb.train(params=params, train_set=data_train, num_boost_round=num_boost_round, categorical_feature=['group'])
+                #bst = gpb.train(params=params, train_set=data_train, num_boost_round=num_boost_round, categorical_feature=['group'], feature_name=[col_name for col_name in datasets['X_train'][0].columns.values])
+
+            else:
+                if linear: # LME models
+                    gp_model.fit(y=y_train, X=X_train_linear)
+                else: # GPBoost models
+                    bst = gpb.train(params=params, train_set=data_train, gp_model=gp_model, num_boost_round=num_boost_round)
+
+            time_list.append(time.time() - start_time)
+
+
+            #################### Prediction ####################
+            if merf:
+                y_pred1 = merf_model.predict(X_test1[['feature_1','feature_2','feature_3','feature_4']], Z_test1, groups_test1)
+                y_pred2 = merf_model.predict(X_test2[['feature_1','feature_2','feature_3','feature_4']], Z_test2, groups_test2)
+                F_pred1 = merf_model.trained_fe_model.predict(X_test1[['feature_1','feature_2','feature_3','feature_4']])
+                F_pred2 = merf_model.trained_fe_model.predict(X_test2[['feature_1','feature_2','feature_3','feature_4']])
+
+            elif GPBoost_cat:
+                y_pred1 = bst.predict(data=X_test1)
+                y_pred2 = bst.predict(data=X_test2)
+
+            else:
+
+                if linear: # LME models
+                    if GP:
+                        if shared:
+                            y_pred1 = gp_model.predict(group_data_pred=groups_test1, gp_coords_pred=times_test1, X_pred=X_test1_linear)['mu']
+                            y_pred2 = gp_model.predict(group_data_pred=groups_test2, gp_coords_pred=times_test2, X_pred=X_test2_linear)['mu']
+                        else:
+                            y_pred1 = gp_model.predict(group_data_pred=groups_test1, gp_coords_pred=times_test1, cluster_ids_pred=groups_test1, X_pred=X_test1_linear)['mu']
+                            y_pred2 = gp_model.predict(group_data_pred=groups_test2, gp_coords_pred=times_test2, cluster_ids_pred=groups_test2, X_pred=X_test2_linear)['mu']
+                    else:
+                        y_pred1 = gp_model.predict(group_data_pred=np.column_stack((groups_test1, times_test1)), X_pred=X_test1_linear)['mu']
+                        y_pred2 = gp_model.predict(group_data_pred=np.column_stack((groups_test2, times_test2)), X_pred=X_test2_linear)['mu']
+
+                        
+
+                    if not no_features: # Linear models Fixed effects part prediction, i.e. F(X) = Xβ for LME models
+                        F_pred1 = X_test1_linear.dot(gp_model.get_coef().T)
+                        F_pred2 = X_test2_linear.dot(gp_model.get_coef().T)
+
+                else: # GPBoost models
+                    if GP:
+                        if shared:
+                            pred1 = bst.predict(data=X_test1[['feature_1','feature_2','feature_3','feature_4']], gp_coords_pred=X_test1['times'], pred_latent=True)
+                            pred2 = bst.predict(data=X_test2[['feature_1','feature_2','feature_3','feature_4']], gp_coords_pred=X_test2['times'], pred_latent=True)
+                        else:
+                            pred1 = bst.predict(data=X_test1[['feature_1','feature_2','feature_3','feature_4']], group_data_pred=groups_test1, gp_coords_pred=times_test1, cluster_ids_pred=groups_test1, pred_latent=True)
+                            pred2 = bst.predict(data=X_test2[['feature_1','feature_2','feature_3','feature_4']], group_data_pred=groups_test2, gp_coords_pred=times_test2, cluster_ids_pred=groups_test2, pred_latent=True)
+                    else:
+                        pred1 = bst.predict(data=X_test1[['feature_1','feature_2','feature_3','feature_4']], group_data_pred=np.column_stack((groups_test1, times_test1)), pred_latent=True)
+                        pred2 = bst.predict(data=X_test2[['feature_1','feature_2','feature_3','feature_4']], group_data_pred=np.column_stack((groups_test2, times_test2)), pred_latent=True)
+
+                        
+
+                    y_pred1 = pred1['fixed_effect'] + pred1['random_effect_mean']
+                    y_pred2 = pred2['fixed_effect'] + pred2['random_effect_mean']
+
+
+                    if not no_features: # Fixed effects part prediction
+                        F_pred1, F_pred2 = pred1['fixed_effect'], pred2['fixed_effect']
+
+
+
+            RMSE_list1.append(np.sqrt(np.mean((y_test1-y_pred1)**2)))
+            RMSE_list2.append(np.sqrt(np.mean((y_test2-y_pred2)**2)))
+
+            if not no_features:
+                F_list.append(np.sqrt(np.mean((F_test1-F_pred1)**2)))
+                F_list.append(np.sqrt(np.mean((F_test2-F_pred2)**2))) # RMSE for F is given by both interpolation and extrapolation
+
+        except:
+            print('Error encountered')
+            continue  
+    
+    #print(gp_model.get_cov_pars().values.squeeze())
+    if no_features: # fixed part prediction is just the global average target value
+        return time_list, RMSE_list1, RMSE_list2
+    else:
+        return time_list, RMSE_list1, RMSE_list2, F_list
+
+
+
+def get_exp_kernel(rho, sigma2):
+    return lambda a, b: sigma2 * np.exp(- (a.reshape(-1, 1) - b.reshape(1, -1))**2 / (rho))
+
+    
+
+def plot_conditional_functions(domain, kernel, X, y, sigma_n=0.25, posterior_samples=False, N_samples = 3):
+
+    # The following expressions are obtained from slide 4 but using y instead of f (i.e. noisy observations case)
+    Kxx = kernel(X, X) + sigma_n**2 * np.eye(X.shape[0])
+    Kx = kernel(domain, X)
+    K = kernel(domain, domain)
+    
+    Kxx_inv = np.linalg.inv(Kxx)
+    
+    mean = Kx @ (Kxx_inv @ y) # A * C^-1 * y from slide 4
+    Cov = K - Kx @ Kxx_inv @ Kx.T #  D - A * C^-1 * A' from the expression (slide 4) for the cond. distr --> f* | x*, x, y
+    
+    d, V = np.linalg.eigh(Cov)
+    L = (np.clip(d, a_min=0.0, a_max=None))**0.5 * V
+    f = np.expand_dims(mean, axis=1) + L @ np.random.randn(L.shape[0], N_samples) # sample points f* from the above conditional distr.
+                                                                   # by using f* = μ + Σ^0.5 * ε , where ε ~ N(0, I)
+                                                                   # with μ and Σ specified as mean, Cov above
+    
+    std = np.diagonal(Cov)**0.5
+    #plt.fill_between(domain, mean-std, mean+std, color='k', alpha=0.1)
+    plt.fill_between(domain, mean-1.96*std, mean+1.96*std, alpha=0.25, fc='b', label='95% confidence interval')
+    plt.plot(domain, mean, label='Posterior mean');
+    
+    if posterior_samples:
+        plt.plot(domain, f);
+
+
+def get_indGP_plot(train_df, interp_test_df, bst, rho=None, sigma2=None, group_no=None, sigma_n=2):
+
+    assert (rho is not None) and (sigma2 is not None) and (group_no is not None)
+
+    group_no , n_training_pts = group_no , train_df[train_df['ID'] == group_no].shape[0]
+
+
+    single_group_data = pd.concat([train_df[train_df['ID'] == group_no] , interp_test_df[interp_test_df['ID'] == group_no]], axis=0, ignore_index=True)
+    y_true = single_group_data['egfr'].to_numpy()
+
+    predictions = bst.predict(data=single_group_data.drop(columns=['egfr', 'ID', 'times']), 
+                                group_data_pred=single_group_data['ID'],
+                                gp_coords_pred=single_group_data['times'],
+                                cluster_ids_pred=single_group_data['ID'].values.astype(int),
+                                predict_var=True, pred_latent=True)
+
+    domain = np.linspace(0, single_group_data['times'].values.max() + 100, 1000)
+
+    # Condition on the datapoints which have been observed in the training set
+    x_obs = single_group_data['times'].values[:n_training_pts]
+    x_test = single_group_data['times'].values[n_training_pts:]
+
+    y_vals = single_group_data['egfr'].values - predictions['fixed_effect']
+    y_obs = y_vals[:n_training_pts]
+    y_test = y_vals[n_training_pts:]
+
+    # Show the learned posterior over group data
+    plt.figure(figsize=(15,6))
+    plot_conditional_functions(domain, get_exp_kernel(rho=15140, sigma2=335), x_obs, y_obs, sigma_n=sigma_n);
+    plt.plot(x_obs, y_obs, 'r.', markersize=10, label='Training points');
+    plt.plot(x_test, y_test, 'k.', markersize=10, label='Test points');
+
+    plt.title(f'Group {group_no} random effects', fontsize=18)
+    plt.xlabel('$t$')
+    plt.ylabel('random effects')
+    plt.legend(loc='upper left');
+    plt.show()
 
 
 
