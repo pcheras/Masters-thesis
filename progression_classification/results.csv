@@ -1,0 +1,7 @@
+﻿Model,Test set accuracy,Test set MCC,ECE
+Log Reg,0.709 +/- 0.0187,0.109 +/- 0,
+SVC,0.759 +/-  0.0145,0.218 +/- 0,
+RF,0.723,0.204,
+Neural Net,,,
+BLL with Laplace,,,
+BLL with SGLD,,,
