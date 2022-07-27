@@ -9,6 +9,8 @@ from sklearn.metrics import accuracy_score, roc_curve, auc, plot_confusion_matri
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, label_binarize
 from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
 from sklearn.metrics import matthews_corrcoef, accuracy_score, make_scorer, matthews_corrcoef
+from sklearn.utils import resample
+
 
 def encode(df):
     #s = (df.dtypes == 'object')
@@ -96,13 +98,21 @@ def print_metrics(model, X_train, y_train, y_pred, X_test, y_test, class_names):
     plt.show()
 
 
-def tune_model_and_get_test_mcc(X, y, model, rand_state, hyperparam_grid, test_size=0.2, print_best_params=False):
+def tune_model_and_get_test_mcc(X, y, model, rand_state, hyperparam_grid, test_size=0.2, print_best_params=False, upsample=False):
     """
     Hyperparameter tuning via cross-validation and prediction on test set routine using sklearn functionality 
     """
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = test_size, random_state = rand_state, stratify = y)
+
+    if upsample:
+        X_minor , y_minor = X_train[y_train == 2] , y_train[y_train == 2]
+        X_tr , y_tr = resample(X_minor, y_minor, n_samples=70, random_state=rand_state, replace=True)
+        X_train , y_train = pd.concat([X_train, X_tr], axis=0).values , np.concatenate([y_train, y_tr]) # upsample train set
+
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=rand_state) # 5-fold validation on the training set for hyperparameter tuning 
-    model_clf = GridSearchCV(estimator=model, param_grid=hyperparam_grid, scoring=make_scorer(matthews_corrcoef), n_jobs=-1, refit=True, cv=skf, verbose=0, error_score='raise')
+    #model_clf = GridSearchCV(estimator=model, param_grid=hyperparam_grid, scoring=make_scorer(matthews_corrcoef), n_jobs=-1, refit=True, cv=skf, verbose=0, error_score='raise')
+    model_clf = GridSearchCV(estimator=model, param_grid=hyperparam_grid, scoring='accuracy', n_jobs=-1, refit=True, cv=skf, verbose=0, error_score='raise')
     model_clf.fit(X=X_train, y=y_train)
     if print_best_params:
         print(model_clf.best_params_)
