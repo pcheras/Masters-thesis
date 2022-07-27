@@ -56,14 +56,17 @@ def train_and_test(model, X_train, y_train, X_test, y_test, precision=False):
     return acc, y_pred
 
 
-def produce_roc(model_pred_probs):
+def produce_roc(model_pred_probs, y_test, class_dict, title):
+
     y_test_bin = label_binarize(y_test, classes=np.arange(3))
     fpr = {}
     tpr = {}
     roc_auc = {}
     plt.figure(figsize=(10, 8))
     colors = ['darkorange', 'darkviolet', 'navy']
+
     for i, color in zip(range(3), colors):
+
         fpr[i], tpr[i], _ = roc_curve(y_test_bin[:, i], model_pred_probs[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
         plt.plot(fpr[i], tpr[i],
@@ -72,6 +75,7 @@ def produce_roc(model_pred_probs):
                 label='ROC curve of {0} class (area = {1:0.2f})'
                 ''.format(class_dict[i], roc_auc[i]))
         plt.plot([0, 1], [0, 1], color='black', lw=2, linestyle='--')
+    plt.title(title, fontsize=20)
     plt.xlabel('False Positive Rate', fontsize=18)
     plt.ylabel('True Positive Rate', fontsize=18)
     plt.legend(loc="lower right")
@@ -82,6 +86,7 @@ def produce_roc(model_pred_probs):
 
 
 def print_metrics(model, X_train, y_train, y_pred, X_test, y_test, class_names):
+
     model.fit(X_train, y_train)
     print(classification_report(y_test, y_pred))
     fig, axs = plt.subplots(figsize=(10, 8))
