@@ -1,3 +1,6 @@
+### This file contains utility functions needed for training & predicting using Bayesian neural network models ###
+
+
 import torch
 import torch.distributions as dist
 import torch.nn as nn
