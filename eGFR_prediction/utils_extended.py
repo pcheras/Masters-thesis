@@ -963,13 +963,13 @@ def get_indGP_plot(train_df, interp_test_df, bst, rho=None, sigma2=None, group_n
 
     # Show the learned posterior over group data
     plt.figure(figsize=(15,6))
-    plot_conditional_functions(domain, get_exp_kernel(rho=15140, sigma2=335), x_obs, y_obs, sigma_n=sigma_n);
+    plot_conditional_functions(domain, get_exp_kernel(rho=rho, sigma2=sigma2), x_obs, y_obs, sigma_n=sigma_n);
     plt.plot(x_obs, y_obs, 'r.', markersize=10, label='Training points');
-    plt.plot(x_test, y_test, 'k.', markersize=10, label='Test points');
+    plt.plot(x_test, y_test, 'k.', markersize=10, label='Test set 1 points');
 
-    plt.title(f'Group {group_no} random effects', fontsize=18)
-    plt.xlabel('$t$')
-    plt.ylabel('random effects')
+    plt.title(f'Patient {group_no} random effects', fontsize=24)
+    plt.xlabel('$t$', fontsize=18)
+    plt.ylabel('random effects', fontsize=18)
     plt.legend(loc='upper left');
     plt.show()
 

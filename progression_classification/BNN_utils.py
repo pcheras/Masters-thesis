@@ -1,6 +1,3 @@
-### This file contains utility functions needed for training & predicting using Bayesian neural network models ###
-
-
 import torch
 import torch.distributions as dist
 import torch.nn as nn
@@ -396,6 +393,8 @@ def SGLD_step(network, X, y, epsilon):
     for layer_num , param in enumerate(network.parameters()):
       if layer_num == 12: # access last layer weights 
         param.data = nn.parameter.Parameter(theta_new.view(3, -1))
+
+    #nn.utils.vector_to_parameters(theta_new, list(network.parameters())[-2]) # put parameters back to the network
     
     return 
 
@@ -460,7 +459,6 @@ def predict_from_posterior_samples(X, network, samples):
     y_hat_samples = torch.zeros((batch_size, 3, len(samples))).to(device)
     
     for i , theta in enumerate(thetas):
-        
         # Run the model forward manually for each MCMC posterior sample
         nn.utils.vector_to_parameters(theta, list(network.parameters())[-2]) # put the sampled parameters in the network's last layer
         y_hat_samples[: , : , i] =  torch.softmax(network.forward(X), axis=1).to(device) # generate the predictions
