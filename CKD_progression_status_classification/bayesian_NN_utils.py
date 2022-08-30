@@ -393,8 +393,6 @@ def SGLD_step(network, X, y, epsilon):
     for layer_num , param in enumerate(network.parameters()):
       if layer_num == 12: # access last layer weights 
         param.data = nn.parameter.Parameter(theta_new.view(3, -1))
-
-    #nn.utils.vector_to_parameters(theta_new, list(network.parameters())[-2]) # put parameters back to the network
     
     return 
 
